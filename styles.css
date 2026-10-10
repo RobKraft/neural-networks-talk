@@ -154,7 +154,7 @@ h3.sub { margin: 18px 0 8px; font-size: 15px; }
 .score-row.best .bar span { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* ---------- training controls ---------- */
-.options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 8px 0 14px; }
+.options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 8px 0 14px; }
 @media (max-width: 520px) { .options { grid-template-columns: 1fr; } }
 .options label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
 select {
@@ -173,6 +173,9 @@ select {
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn.ghost { background: transparent; }
 .btn.small { font-size: 13px; padding: 4px 10px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--border); }
+.btn.primary:disabled:hover { border-color: var(--accent); }
 .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .speed { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); font-weight: 600; }
@@ -212,6 +215,17 @@ figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
 .sw.pos { background: var(--pos); }
 .sw.neg { background: var(--neg); margin-left: 6px; }
 
+.backprop {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  margin: 4px 0 16px; padding: 12px 14px;
+  background: var(--surface-2); border: 1px dashed var(--border); border-radius: 8px;
+  font-size: 15px;
+}
+.backprop[hidden] { display: none; }
+.backprop.pending { border: 2px solid var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--surface-2)); }
+.backprop-text { flex: 1 1 320px; }
+.backprop-text code { font-family: var(--mono); font-size: 13px; }
+
 .table-wrap { overflow-x: auto; }
 .weights { border-collapse: separate; border-spacing: 3px; font: 14px var(--mono); margin-bottom: 8px; }
 .weights th { color: var(--muted); font-weight: 600; padding: 2px 4px; }
@@ -223,6 +237,17 @@ figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
 .weights td.changed { animation: flash 1s ease-out; }
 @keyframes flash { from { box-shadow: 0 0 0 3px var(--flash) inset; } to { box-shadow: 0 0 0 3px transparent inset; } }
 .weights tr.best th.row { color: var(--accent); }
+.weights td { position: relative; }
+.weights td.pending { outline: 2px dashed var(--bad); outline-offset: -2px; }
+.weights .delta {
+  position: absolute; top: -7px; right: -5px;
+  padding: 0 4px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; line-height: 16px;
+  color: #fff;
+}
+.weights .delta.up { background: var(--pos); }
+.weights .delta.down { background: var(--neg); }
+.weights tr.pending th.row { color: var(--bad); }
 
 /* ---------- log ---------- */
 .log {

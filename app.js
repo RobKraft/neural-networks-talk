@@ -85,9 +85,14 @@ function createModel() {
     epoch: 0,
     updates: 0,
     queue: [],
+    pending: null, // a wrong guess whose weight update is waiting (manual mode)
     converged: false,
     convergedAt: null
   };
+}
+
+function manualUpdates() {
+  return $("#opt-update").value === "manual";
 }
 
 function scoresFor(x) {
@@ -119,8 +124,9 @@ function nextEpochOrder() {
   return model.setName === "three" ? [...TALK_SEQUENCE] : [...model.active];
 }
 
-// One training step. Returns a record of what happened.
-function trainStep() {
+// Forward pass: show the network the next training digit and let it guess.
+// Returns a record of what happened; weights are not changed yet.
+function forwardStep() {
   if (model.queue.length === 0) {
     model.epoch++;
     model.queue = nextEpochOrder();
@@ -129,23 +135,36 @@ function trainStep() {
   const x = DIGITS[trainDigit];
   const scores = scoresFor(x);
   const predicted = predict(x);
-  const wrong = predicted !== trainDigit;
   model.step++;
+  return {
+    step: model.step, epoch: model.epoch, trainDigit, predicted,
+    wrong: predicted !== trainDigit, applied: false, scores, x
+  };
+}
 
-  if (wrong) {
-    // Correct digit += x, wrong prediction -= x
-    model.weights[trainDigit] = model.weights[trainDigit].map((w, i) => w + x[i]);
-    model.weights[predicted] = model.weights[predicted].map((w, i) => w - x[i]);
-    model.updates++;
-  }
+// The learning part: correct digit += x, wrong prediction -= x
+function applyUpdate(r) {
+  const { trainDigit, predicted, x } = r;
+  model.weights[trainDigit] = model.weights[trainDigit].map((w, i) => w + x[i]);
+  model.weights[predicted] = model.weights[predicted].map((w, i) => w - x[i]);
+  model.updates++;
+  r.applied = true;
+}
 
-  const record = { step: model.step, epoch: model.epoch, trainDigit, predicted, wrong, scores, x };
+function checkConverged(r) {
   if (!model.converged && correctCount() === model.active.length) {
     model.converged = true;
     model.convergedAt = model.step;
-    record.justConverged = true;
+    r.justConverged = true;
   }
-  return record;
+}
+
+// One full training step (guess, then update if wrong).
+function trainStep() {
+  const r = forwardStep();
+  if (r.wrong) applyUpdate(r);
+  checkConverged(r);
+  return r;
 }
 
 // ---------------------------------------------------------------------------
@@ -327,8 +346,14 @@ function renderWeights(changedDigits, predicted) {
   table.appendChild(head);
 
   const maxW = maxAbsWeight();
+  const pending = model.pending;
   for (const d of model.active) {
-    const tr = el("tr", { class: d === predicted ? "best" : "" });
+    // In manual mode, preview which cells the pending update will change
+    let delta = 0;
+    if (pending && d === pending.trainDigit) delta = 1;
+    if (pending && d === pending.predicted) delta = -1;
+
+    const tr = el("tr", { class: (d === predicted ? "best " : "") + (delta ? "pending" : "") });
     const th = el("th", { class: "row", scope: "row" });
     th.textContent = `w${d}`;
     tr.appendChild(th);
@@ -338,6 +363,12 @@ function renderWeights(changedDigits, predicted) {
       if (w !== 0) {
         const pct = Math.round(15 + (Math.abs(w) / maxW) * 55);
         td.style.background = `color-mix(in srgb, var(${w > 0 ? "--pos" : "--neg"}) ${pct}%, var(--surface-2))`;
+      }
+      if (delta && pending.x[i]) {
+        td.classList.add("pending");
+        const badge = el("span", { class: "delta " + (delta > 0 ? "up" : "down") });
+        badge.textContent = delta > 0 ? "+1" : "−1";
+        td.appendChild(badge);
       }
       if (changedDigits.includes(d) && lastRecord && lastRecord.x[i]) td.classList.add("changed");
       tr.appendChild(td);
@@ -353,7 +384,10 @@ function renderStats() {
   $("#stat-updates").textContent = model.updates;
 
   const status = $("#status");
-  if (model.converged) {
+  if (model.pending) {
+    status.textContent = "Waiting for back propagation";
+    status.className = "pill busy";
+  } else if (model.converged) {
     status.textContent = `Learned ✓ in ${model.convergedAt} steps`;
     status.className = "pill good";
   } else if (playTimer) {
@@ -368,6 +402,8 @@ function renderStats() {
   }
 
   $("#btn-play").textContent = playTimer ? "Pause" : "Play";
+  $("#btn-step").disabled = !!model.pending;
+  $("#btn-play").disabled = !!model.pending;
   document.querySelectorAll(".digit-btn").forEach((b) => {
     b.classList.toggle("inactive", !model.active.includes(Number(b.dataset.digit)));
   });
@@ -381,7 +417,12 @@ function renderExplain() {
   box.className = "explain " + (r.wrong ? "bad" : "good");
   let html = `<div class="head">Step ${r.step} · Epoch ${r.epoch}: shown a ${r.trainDigit}</div>`;
   html += `<div>Scores: <code>${scoreText}</code></div>`;
-  if (r.wrong) {
+  if (r.wrong && !r.applied) {
+    html += `<div>It guessed <strong>${r.predicted}</strong> ✗. Nothing has changed yet. ` +
+      `The fix will <strong>raise</strong> <code>w${r.trainDigit}</code> and <strong>lower</strong> ` +
+      `<code>w${r.predicted}</code> on the lit segments. Talk it through, then click ` +
+      `<strong>Perform Back Propagation</strong> in section 3.</div>`;
+  } else if (r.wrong) {
     html += `<div>It guessed <strong>${r.predicted}</strong> ✗. So it <strong>added</strong> the ${r.trainDigit}'s lit segments to <code>w${r.trainDigit}</code> and <strong>subtracted</strong> them from <code>w${r.predicted}</code>.</div>`;
   } else {
     html += `<div>It guessed <strong>${r.predicted}</strong> ✓. Correct, so no weights change.</div>`;
@@ -392,6 +433,36 @@ function renderExplain() {
   box.innerHTML = html;
 }
 
+function renderBackprop() {
+  const panel = $("#backprop");
+  const manual = manualUpdates();
+  panel.hidden = !manual;
+  if (!manual) return;
+
+  const r = model.pending;
+  const text = $("#backprop-text");
+  const button = $("#btn-backprop");
+  button.disabled = !r;
+  panel.classList.toggle("pending", !!r);
+
+  const segs = (x) => SEGMENTS.filter((_, i) => x[i]).join(" ");
+  if (r) {
+    text.innerHTML =
+      `<strong>Wrong guess: it said ${r.predicted}, the answer is ${r.trainDigit}.</strong> ` +
+      `Pending fix on lit segments <code>${segs(r.x)}</code>: ` +
+      `<code>w${r.trainDigit}</code> +1 each, <code>w${r.predicted}</code> −1 each ` +
+      `(dashed cells below).`;
+  } else if (lastRecord && lastRecord.wrong && lastRecord.applied) {
+    text.innerHTML =
+      `Applied: <code>w${lastRecord.trainDigit}</code> went up and ` +
+      `<code>w${lastRecord.predicted}</code> went down (highlighted cells). Press <strong>Step</strong> for the next digit.`;
+  } else {
+    text.innerHTML =
+      "Manual mode: when the network guesses wrong, training pauses here so you can discuss " +
+      "the error before the weights change.";
+  }
+}
+
 function appendLog(r) {
   const log = $("#log");
   log.querySelector(".empty")?.remove();
@@ -400,9 +471,20 @@ function appendLog(r) {
   let text = `Step ${r.step} (Epoch ${r.epoch}): train on ${r.trainDigit}\n  Scores: ${scoreText}\n  Predicted: ${r.predicted} `;
   entry.textContent = text;
   const verdict = el("span", { class: r.wrong ? "bad" : "good" });
-  verdict.textContent = r.wrong ? "(wrong, updating)" : "(correct)";
+  verdict.textContent = !r.wrong ? "(correct)" : r.applied ? "(wrong, updating)" : "(wrong, waiting for back propagation)";
   entry.appendChild(verdict);
+  r.logEntry = { entry, verdict };
+  if (r.applied || !r.wrong) appendLogResult(r);
+  log.appendChild(entry);
+  while (log.children.length > MAX_LOG_ENTRIES) log.firstElementChild.remove();
+  log.scrollTop = log.scrollHeight;
+}
+
+// Weight changes (and convergence) for a log entry, added once the update is applied
+function appendLogResult(r) {
+  const { entry, verdict } = r.logEntry;
   if (r.wrong) {
+    verdict.textContent = "(wrong, updating)";
     entry.appendChild(document.createTextNode(
       `\n    w${r.trainDigit}: [${model.weights[r.trainDigit].join(", ")}]` +
       `\n    w${r.predicted}: [${model.weights[r.predicted].join(", ")}]`
@@ -411,8 +493,7 @@ function appendLog(r) {
   if (r.justConverged) {
     entry.appendChild(document.createTextNode(`\n=== Converged in ${r.step} steps across ${r.epoch} epochs ===`));
   }
-  log.appendChild(entry);
-  while (log.children.length > MAX_LOG_ENTRIES) log.firstElementChild.remove();
+  const log = $("#log");
   log.scrollTop = log.scrollHeight;
 }
 
@@ -427,25 +508,60 @@ function renderAll(changedDigits = []) {
   renderWeights(changedDigits, predicted);
   renderStats();
   renderExplain();
+  renderBackprop();
 }
 
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
 
-function doStep() {
-  if (model.step >= MAX_STEPS) return stopPlay();
-  const r = trainStep();
+function showTrainingInput(r) {
   lastRecord = r;
   input = [...r.x];
   inputSource = { kind: "train", digit: r.trainDigit };
+}
+
+function doStep() {
+  if (model.pending) return;
+  if (model.step >= MAX_STEPS) return stopPlay();
+  const r = forwardStep();
+  showTrainingInput(r);
+
+  if (r.wrong && manualUpdates()) {
+    // Pause before learning so the mistake can be discussed
+    model.pending = r;
+    appendLog(r);
+    stopPlay();
+    renderAll();
+    return;
+  }
+
+  if (r.wrong) applyUpdate(r);
+  checkConverged(r);
   appendLog(r);
   if (r.justConverged) stopPlay();
   renderAll(r.wrong ? [r.trainDigit, r.predicted] : []);
 }
 
+function applyPending() {
+  const r = model.pending;
+  if (!r) return null;
+  model.pending = null;
+  applyUpdate(r);
+  checkConverged(r);
+  appendLogResult(r);
+  return r;
+}
+
+function performBackprop() {
+  const r = applyPending();
+  if (!r) return;
+  showTrainingInput(r);
+  renderAll([r.trainDigit, r.predicted]);
+}
+
 function startPlay() {
-  if (playTimer) return;
+  if (playTimer || model.pending) return;
   if (model.converged) resetModel();
   const tick = () => {
     doStep();
@@ -467,7 +583,7 @@ function togglePlay() {
 
 function finish() {
   stopPlay();
-  let r = null;
+  let r = applyPending();
   while (!model.converged && model.step < MAX_STEPS) {
     r = trainStep();
     appendLog(r);
@@ -536,9 +652,15 @@ function init() {
   $("#btn-finish").addEventListener("click", finish);
   $("#btn-reset").addEventListener("click", resetModel);
   $("#btn-clear-log").addEventListener("click", clearLog);
+  $("#btn-backprop").addEventListener("click", performBackprop);
   for (const id of ["#opt-set", "#opt-order", "#opt-init"]) {
     $(id).addEventListener("change", resetModel);
   }
+  $("#opt-update").addEventListener("change", () => {
+    // Switching back to automatic finishes any update that was waiting
+    if (!manualUpdates() && model.pending) performBackprop();
+    else renderAll();
+  });
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -546,6 +668,7 @@ function init() {
     if (e.key === "s" || e.key === "S" || e.key === "ArrowRight") { stopPlay(); doStep(); e.preventDefault(); }
     else if (e.key === " ") { togglePlay(); e.preventDefault(); }
     else if (e.key === "r" || e.key === "R") { resetModel(); e.preventDefault(); }
+    else if (e.key === "b" || e.key === "B") { performBackprop(); e.preventDefault(); }
   });
 
   resetModel();

@@ -69,6 +69,12 @@
               <option value="random">Random</option>
             </select>
           </label>
+          <label>Weight updates
+            <select id="opt-update">
+              <option value="auto">Apply automatically</option>
+              <option value="manual">Wait for me (manual)</option>
+            </select>
+          </label>
         </div>
 
         <div class="controls">
@@ -102,6 +108,10 @@
         <h2 id="model-h">3 · The model is just these numbers</h2>
         <span class="legend"><i class="sw pos"></i>positive <i class="sw neg"></i>negative</span>
       </div>
+      <div id="backprop" class="backprop" hidden>
+        <div id="backprop-text" class="backprop-text"></div>
+        <button id="btn-backprop" class="btn primary" disabled title="Shortcut: B">Perform Back Propagation</button>
+      </div>
       <div class="grid model">
         <figure class="net-fig">
           <svg id="network" class="network" role="img" aria-label="Network diagram: 7 inputs connected to each output digit"></svg>
@@ -132,7 +142,7 @@
           <li><strong>Light up a non-digit shape.</strong> The network still answers confidently. It can only choose from what it was trained on.</li>
           <li><strong>Someone has to know the right answers.</strong> Every update needs a label, which makes this <em>supervised</em> learning.</li>
         </ul>
-        <p class="muted small">Keyboard: <kbd>S</kbd>/<kbd>→</kbd> step · <kbd>Space</kbd> play/pause · <kbd>R</kbd> reset</p>
+        <p class="muted small">Keyboard: <kbd>S</kbd>/<kbd>→</kbd> step · <kbd>Space</kbd> play/pause · <kbd>R</kbd> reset · <kbd>B</kbd> back propagation (manual mode)</p>
       </section>
     </div>
   </main>
