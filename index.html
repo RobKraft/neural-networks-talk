@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perceptron Playground</title>
+  <meta name="description" content="Watch a tiny neural network learn to read a 7-segment display, one weight update at a time.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 200'%3E%3Cg fill='%230e7c86'%3E%3Cpolygon points='22,12 30,4 90,4 98,12 90,20 30,20'/%3E%3Cpolygon points='106,16 114,24 114,88 106,96 98,88 98,24'/%3E%3Cpolygon points='106,104 114,112 114,176 106,184 98,176 98,112'/%3E%3Cpolygon points='22,100 30,92 90,92 98,100 90,108 30,108'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Neural Networks, from the ground up</p>
+      <h1>Perceptron Playground</h1>
+      <p class="lede">
+        A neural network is just a pile of numbers called <strong>weights</strong>.
+        Watch one learn to read a 7-segment display: it guesses, checks the answer,
+        and nudges its weights when it's wrong. That's the whole idea.
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="grid top">
+      <!-- INPUT / PREDICTION -->
+      <section class="card" aria-labelledby="input-h">
+        <div class="card-head">
+          <h2 id="input-h">1 · The input</h2>
+          <span id="input-source" class="pill">Your input</span>
+        </div>
+        <p class="hint">Click the segments to light them up, or pick a digit below.</p>
+        <div class="display-row">
+          <svg id="display" class="seven" viewBox="0 0 120 200" role="group" aria-label="7-segment display, click segments to toggle"></svg>
+          <div class="prediction">
+            <div class="pred-label">Network says</div>
+            <div id="pred-digit" class="pred-digit">?</div>
+            <div id="pred-note" class="pred-note"></div>
+          </div>
+        </div>
+        <div id="digit-buttons" class="digit-buttons" aria-label="Load a digit pattern"></div>
+        <h3 class="sub">Scores <span class="muted">(weights · input)</span></h3>
+        <div id="scores" class="scores"></div>
+      </section>
+
+      <!-- TRAINING -->
+      <section class="card" aria-labelledby="train-h">
+        <div class="card-head">
+          <h2 id="train-h">2 · Train it</h2>
+          <span id="status" class="pill">Untrained</span>
+        </div>
+
+        <div class="options">
+          <label>Digits
+            <select id="opt-set">
+              <option value="three">3, 8, 9 (warm-up)</option>
+              <option value="ten" selected>All ten: 0–9</option>
+            </select>
+          </label>
+          <label>Training order
+            <select id="opt-order">
+              <option value="fixed">Fixed</option>
+              <option value="shuffle">Shuffled each epoch</option>
+            </select>
+          </label>
+          <label>Starting weights
+            <select id="opt-init">
+              <option value="zero">All zero</option>
+              <option value="random">Random</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="controls">
+          <button id="btn-step" class="btn primary" title="Shortcut: S or →">Step</button>
+          <button id="btn-play" class="btn" title="Shortcut: Space">Play</button>
+          <button id="btn-finish" class="btn">Train to the end</button>
+          <button id="btn-reset" class="btn ghost" title="Shortcut: R">Reset</button>
+        </div>
+        <label class="speed">Speed
+          <input id="opt-speed" type="range" min="0" max="100" value="45" aria-label="Playback speed">
+        </label>
+
+        <div class="stats">
+          <div><span id="stat-step">0</span><small>steps</small></div>
+          <div><span id="stat-epoch">0</span><small>epochs</small></div>
+          <div><span id="stat-acc">0/10</span><small>correct</small></div>
+          <div><span id="stat-updates">0</span><small>updates</small></div>
+        </div>
+
+        <div id="explain" class="explain">
+          Press <strong>Step</strong>. The network sees a digit, scores every possible answer,
+          and picks the highest. If it's wrong, it <em>adds</em> the input to the right
+          answer's weights and <em>subtracts</em> it from the wrong guess's weights.
+        </div>
+      </section>
+    </div>
+
+    <!-- THE MODEL -->
+    <section class="card" aria-labelledby="model-h">
+      <div class="card-head">
+        <h2 id="model-h">3 · The model is just these numbers</h2>
+        <span class="legend"><i class="sw pos"></i>positive <i class="sw neg"></i>negative</span>
+      </div>
+      <div class="grid model">
+        <figure class="net-fig">
+          <svg id="network" class="network" role="img" aria-label="Network diagram: 7 inputs connected to each output digit"></svg>
+          <figcaption>7 inputs (one per segment) → one output per digit. Line thickness is the weight's size.</figcaption>
+        </figure>
+        <div class="table-wrap">
+          <table id="weights" class="weights" aria-label="Weight table"></table>
+          <p class="hint">Each row is one output neuron's weights. Cells flash when a training step changes them.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid bottom">
+      <section class="card" aria-labelledby="log-h">
+        <div class="card-head">
+          <h2 id="log-h">Training log</h2>
+          <button id="btn-clear-log" class="btn small ghost">Clear</button>
+        </div>
+        <div id="log" class="log" aria-live="off"></div>
+      </section>
+
+      <section class="card notes" aria-labelledby="notes-h">
+        <h2 id="notes-h">Things to notice</h2>
+        <ul>
+          <li><strong>Reset with "Shuffled" order a few times.</strong> The step count and final weights change every run. Many different weight sets give the same right answers, so training isn't deterministic.</li>
+          <li><strong>The model is only the table above.</strong> Once training stops, you can ship those numbers as a finished, frozen model.</li>
+          <li><strong>Try to "debug" a weight.</strong> Why is one cell −3? No single number explains a decision. That's why nobody can just patch a model's bad answer.</li>
+          <li><strong>Light up a non-digit shape.</strong> The network still answers confidently. It can only choose from what it was trained on.</li>
+          <li><strong>Someone has to know the right answers.</strong> Every update needs a label, which makes this <em>supervised</em> learning.</li>
+        </ul>
+        <p class="muted small">Keyboard: <kbd>S</kbd>/<kbd>→</kbd> step · <kbd>Space</kbd> play/pause · <kbd>R</kbd> reset</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="wrap footer">
+    <p>Built for a Kansas City user group talk on neural networks by Rob Kraft.
+      <a href="https://github.com/RobKraft/neural-networks-talk">Source on GitHub</a>, including the original console versions of this code.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
