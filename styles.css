@@ -115,6 +115,15 @@ h3.sub { margin: 18px 0 8px; font-size: 15px; }
 #display polygon { cursor: pointer; }
 #display polygon:hover { stroke: var(--accent); stroke-width: 2; }
 #display polygon:focus-visible { outline: none; stroke: var(--text); stroke-width: 3; }
+.seg-label {
+  font: 700 13px var(--mono);
+  fill: var(--muted);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  user-select: none;
+}
+.seven polygon.on + .seg-label { fill: var(--accent-ink); }
 
 .prediction { min-width: 0; }
 .pred-label { color: var(--muted); font-size: 14px; }

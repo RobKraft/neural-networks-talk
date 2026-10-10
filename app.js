@@ -44,6 +44,8 @@ const SEGMENT_POINTS = [
   vSeg(14, 16, 96),   // f
   hSeg(100, 22, 98)   // g
 ];
+// Where each segment's letter label sits (the segment's center)
+const SEGMENT_CENTERS = [[60, 12], [106, 56], [106, 144], [60, 188], [14, 144], [14, 56], [60, 100]];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const $ = (sel) => document.querySelector(sel);
@@ -204,6 +206,12 @@ function drawSeven(svg, pattern, interactive) {
       p.dataset.index = i;
     }
     svg.appendChild(p);
+    if (interactive) {
+      const [cx, cy] = SEGMENT_CENTERS[i];
+      const label = el("text", { class: "seg-label", x: cx, y: cy, "aria-hidden": "true" }, SVG_NS);
+      label.textContent = SEGMENTS[i];
+      svg.appendChild(label);
+    }
   });
 }
 
