@@ -20,6 +20,11 @@ billions of weights.
 
 ### Things to try
 
+- **Digits "1, 3, 8" with fixed order.** At step 3 the network gets 3 right.
+  At step 4 it fixes its mistake on 8, and because every segment of 3 is also
+  in 8, that fix breaks 3. Step 5 repairs it. A set of weights that gives the
+  right answer for one input may still need to change. The page flags every
+  update that breaks a digit that was already correct.
 - **Shuffled order + Reset a few times.** The number of steps and the final
   weights change every run. Many different sets of weights give the same correct
   answers, so training isn't deterministic.
@@ -41,6 +46,7 @@ The original scripts from the talk are in [`console/`](console). They need
 [Node.js](https://nodejs.org/) and nothing else:
 
 ```bash
+node console/train-1-3-8.js        # 3 is learned, then fixing 8 breaks it
 node console/train-3-8-9.js        # warm-up: learn just 3, 8 and 9
 node console/train-all-digits.js   # learn all ten digits until every one is correct
 ```
@@ -59,6 +65,7 @@ npx http-server . -p 8080
 | File | What it is |
 | --- | --- |
 | `index.html`, `styles.css`, `app.js` | The interactive Perceptron Playground |
+| `console/train-1-3-8.js` | Console demo: a correct answer for 3 gets broken by the fix for 8 |
 | `console/train-3-8-9.js` | Console demo: three digits, fixed training sequence |
 | `console/train-all-digits.js` | Console demo: all ten digits, trains until 10/10 |
 

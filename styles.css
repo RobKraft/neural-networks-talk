@@ -202,6 +202,25 @@ select {
   padding: 12px 14px;
   font-size: 15px;
 }
+.digit-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -4px 0 16px; }
+.digit-status { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  font: 600 13px var(--mono);
+  padding: 1px 7px;
+  border-radius: 999px;
+  transition: background .2s, color .2s;
+}
+.chip.good { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.chip.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+
+.explain .warn {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
 .explain.good { border-left-color: var(--good); }
 .explain.bad { border-left-color: var(--bad); }
 .explain .head { font-weight: 700; margin-bottom: 4px; }

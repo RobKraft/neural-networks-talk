@@ -18,12 +18,17 @@ const DIGITS = {
 };
 
 const DIGIT_SETS = {
+  nested: [1, 3, 8],
   three: [3, 8, 9],
   ten: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 };
 
-// The warm-up example's training order, from console/train-3-8-9.js
-const TALK_SEQUENCE = [3, 8, 9, 3, 9, 8, 3, 8, 9];
+// Fixed training orders for the warm-up examples (see console/).
+// nested: 3 is learned correctly at step 3, then fixing 8 at step 4 breaks it again.
+const FIXED_SEQUENCES = {
+  nested: [3, 1, 3, 8, 3],
+  three: [3, 8, 9, 3, 9, 8, 3, 8, 9]
+};
 
 const MAX_STEPS = 100000; // Safety cap, same as the console version
 const MAX_LOG_ENTRIES = 400;
@@ -88,6 +93,7 @@ function createModel() {
     updates: 0,
     queue: [],
     pending: null, // a wrong guess whose weight update is waiting (manual mode)
+    brokenBy: {},  // digit -> the earlier update that turned it from right to wrong
     converged: false,
     convergedAt: null
   };
@@ -117,13 +123,24 @@ function predict(x) {
   return bestDigit;
 }
 
+// Correct with a score strictly above every other digit (not just winning a tie)
+function winsOutright(d) {
+  const mine = dot(model.weights[d], DIGITS[d]);
+  return model.active.every((e) => e === d || dot(model.weights[e], DIGITS[d]) < mine);
+}
+
+// "a 3", "an 8"
+function aDigit(d) {
+  return `${d === 8 ? "an" : "a"} ${d}`;
+}
+
 function correctCount() {
   return model.active.filter((d) => predict(DIGITS[d]) === d).length;
 }
 
 function nextEpochOrder() {
   if (model.order === "shuffle") return shuffle(model.active);
-  return model.setName === "three" ? [...TALK_SEQUENCE] : [...model.active];
+  return [...(FIXED_SEQUENCES[model.setName] || model.active)];
 }
 
 // Forward pass: show the network the next training digit and let it guess.
@@ -138,19 +155,33 @@ function forwardStep() {
   const scores = scoresFor(x);
   const predicted = predict(x);
   model.step++;
-  return {
+  const record = {
     step: model.step, epoch: model.epoch, trainDigit, predicted,
-    wrong: predicted !== trainDigit, applied: false, scores, x
+    wrong: predicted !== trainDigit, applied: false, broke: [], scores, x
   };
+  // Seeing a digit again that an earlier fix broke
+  if (record.wrong && model.brokenBy[trainDigit]) record.wasBrokenBy = model.brokenBy[trainDigit];
+  delete model.brokenBy[trainDigit];
+  return record;
 }
 
 // The learning part: correct digit += x, wrong prediction -= x
 function applyUpdate(r) {
   const { trainDigit, predicted, x } = r;
+  const correctBefore = model.active.filter(winsOutright);
   model.weights[trainDigit] = model.weights[trainDigit].map((w, i) => w + x[i]);
   model.weights[predicted] = model.weights[predicted].map((w, i) => w - x[i]);
   model.updates++;
   r.applied = true;
+  // Digits this fix knocked out: right before the update, wrong after it
+  r.broke = correctBefore
+    .filter((d) => predict(DIGITS[d]) !== d)
+    .map((d) => ({ digit: d, nowSays: predict(DIGITS[d]) }));
+  for (const b of r.broke) model.brokenBy[b.digit] = { step: r.step, digit: trainDigit };
+}
+
+function brokeText(r) {
+  return r.broke.map((b) => `${b.digit} (now reads as ${b.nowSays})`).join(" and ");
 }
 
 function checkConverged(r) {
@@ -245,12 +276,12 @@ function renderPrediction() {
   } else if (actual === null) {
     note.textContent = "That's not a digit, but it has to pick one anyway.";
   } else if (!model.active.includes(actual)) {
-    note.textContent = `That's a ${actual}, but this network was never taught about ${actual}s.`;
+    note.textContent = `That's ${aDigit(actual)}, but this network was never taught about ${actual}s.`;
   } else if (actual === predicted) {
     note.textContent = "Correct ✓";
     note.classList.add("good");
   } else {
-    note.textContent = `Wrong ✗ (it's a ${actual})`;
+    note.textContent = `Wrong ✗ (it's ${aDigit(actual)})`;
     note.classList.add("bad");
   }
 
@@ -391,6 +422,16 @@ function renderStats() {
   $("#stat-acc").textContent = `${correctCount()}/${model.active.length}`;
   $("#stat-updates").textContent = model.updates;
 
+  // Which digits the current weights get right
+  const chips = $("#digit-status");
+  chips.textContent = "";
+  for (const d of model.active) {
+    const ok = predict(DIGITS[d]) === d;
+    const chip = el("span", { class: "chip " + (ok ? "good" : "bad"), title: ok ? `${d} is correct` : `${d} reads as ${predict(DIGITS[d])}` });
+    chip.textContent = `${d} ${ok ? "✓" : "✗"}`;
+    chips.appendChild(chip);
+  }
+
   const status = $("#status");
   if (model.pending) {
     status.textContent = "Waiting for back propagation";
@@ -423,8 +464,11 @@ function renderExplain() {
   const r = lastRecord;
   const scoreText = model.active.map((d) => `${d}=${r.scores[d]}`).join(", ");
   box.className = "explain " + (r.wrong ? "bad" : "good");
-  let html = `<div class="head">Step ${r.step} · Epoch ${r.epoch}: shown a ${r.trainDigit}</div>`;
+  let html = `<div class="head">Step ${r.step} · Epoch ${r.epoch}: shown ${aDigit(r.trainDigit)}</div>`;
   html += `<div>Scores: <code>${scoreText}</code></div>`;
+  if (r.wasBrokenBy) {
+    html += `<div class="warn">This ${r.trainDigit} used to be correct. The fix for ${r.wasBrokenBy.digit} at step ${r.wasBrokenBy.step} broke it.</div>`;
+  }
   if (r.wrong && !r.applied) {
     html += `<div>It guessed <strong>${r.predicted}</strong> ✗. Nothing has changed yet. ` +
       `The fix will <strong>raise</strong> <code>w${r.trainDigit}</code> and <strong>lower</strong> ` +
@@ -434,6 +478,11 @@ function renderExplain() {
     html += `<div>It guessed <strong>${r.predicted}</strong> ✗. So it <strong>added</strong> the ${r.trainDigit}'s lit segments to <code>w${r.trainDigit}</code> and <strong>subtracted</strong> them from <code>w${r.predicted}</code>.</div>`;
   } else {
     html += `<div>It guessed <strong>${r.predicted}</strong> ✓. Correct, so no weights change.</div>`;
+  }
+  if (r.broke.length) {
+    html += `<div class="warn">⚠ This fix broke ${brokeText(r)}. ` +
+      `${r.broke.length > 1 ? "They were" : "It was"} correct before the update. ` +
+      `Getting one answer right doesn't mean the weights are finished.</div>`;
   }
   if (r.justConverged) {
     html += `<div class="head" style="margin-top:6px">All ${model.active.length} digits are now correct. Training is done.</div>`;
@@ -463,7 +512,9 @@ function renderBackprop() {
   } else if (lastRecord && lastRecord.wrong && lastRecord.applied) {
     text.innerHTML =
       `Applied: <code>w${lastRecord.trainDigit}</code> went up and ` +
-      `<code>w${lastRecord.predicted}</code> went down (highlighted cells). Press <strong>Step</strong> for the next digit.`;
+      `<code>w${lastRecord.predicted}</code> went down (highlighted cells).` +
+      (lastRecord.broke.length ? ` <strong>⚠ It also broke ${brokeText(lastRecord)}.</strong>` : "") +
+      ` Press <strong>Step</strong> for the next digit.`;
   } else {
     text.innerHTML =
       "Manual mode: when the network guesses wrong, training pauses here so you can discuss " +
@@ -497,6 +548,11 @@ function appendLogResult(r) {
       `\n    w${r.trainDigit}: [${model.weights[r.trainDigit].join(", ")}]` +
       `\n    w${r.predicted}: [${model.weights[r.predicted].join(", ")}]`
     ));
+    if (r.broke.length) {
+      const warn = el("span", { class: "bad" });
+      warn.textContent = `\n  ⚠ This update broke ${brokeText(r)}`;
+      entry.appendChild(warn);
+    }
   }
   if (r.justConverged) {
     entry.appendChild(document.createTextNode(`\n=== Converged in ${r.step} steps across ${r.epoch} epochs ===`));
