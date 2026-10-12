@@ -243,16 +243,16 @@ figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
 .sw.pos { background: var(--pos); }
 .sw.neg { background: var(--neg); margin-left: 6px; }
 
-.backprop {
+.adjust-panel {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
   margin: 4px 0 16px; padding: 12px 14px;
   background: var(--surface-2); border: 1px dashed var(--border); border-radius: 8px;
   font-size: 15px;
 }
-.backprop[hidden] { display: none; }
-.backprop.pending { border: 2px solid var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--surface-2)); }
-.backprop-text { flex: 1 1 320px; }
-.backprop-text code { font-family: var(--mono); font-size: 13px; }
+.adjust-panel[hidden] { display: none; }
+.adjust-panel.pending { border: 2px solid var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--surface-2)); }
+.adjust-text { flex: 1 1 320px; }
+.adjust-text code { font-family: var(--mono); font-size: 13px; }
 
 .table-wrap { overflow-x: auto; }
 .weights { border-collapse: separate; border-spacing: 3px; font: 14px var(--mono); margin-bottom: 8px; }

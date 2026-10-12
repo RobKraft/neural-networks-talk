@@ -434,7 +434,7 @@ function renderStats() {
 
   const status = $("#status");
   if (model.pending) {
-    status.textContent = "Waiting for back propagation";
+    status.textContent = "Waiting to adjust weights";
     status.className = "pill busy";
   } else if (model.converged) {
     status.textContent = `Learned ✓ in ${model.convergedAt} steps`;
@@ -473,7 +473,7 @@ function renderExplain() {
     html += `<div>It guessed <strong>${r.predicted}</strong> ✗. Nothing has changed yet. ` +
       `The fix will <strong>raise</strong> <code>w${r.trainDigit}</code> and <strong>lower</strong> ` +
       `<code>w${r.predicted}</code> on the lit segments. Talk it through, then click ` +
-      `<strong>Perform Back Propagation</strong> in section 3.</div>`;
+      `<strong>Adjust Weights</strong> in section 3.</div>`;
   } else if (r.wrong) {
     html += `<div>It guessed <strong>${r.predicted}</strong> ✗. So it <strong>added</strong> the ${r.trainDigit}'s lit segments to <code>w${r.trainDigit}</code> and <strong>subtracted</strong> them from <code>w${r.predicted}</code>.</div>`;
   } else {
@@ -490,15 +490,15 @@ function renderExplain() {
   box.innerHTML = html;
 }
 
-function renderBackprop() {
-  const panel = $("#backprop");
+function renderAdjustPanel() {
+  const panel = $("#adjust-panel");
   const manual = manualUpdates();
   panel.hidden = !manual;
   if (!manual) return;
 
   const r = model.pending;
-  const text = $("#backprop-text");
-  const button = $("#btn-backprop");
+  const text = $("#adjust-text");
+  const button = $("#btn-adjust");
   button.disabled = !r;
   panel.classList.toggle("pending", !!r);
 
@@ -530,7 +530,7 @@ function appendLog(r) {
   let text = `Step ${r.step} (Epoch ${r.epoch}): train on ${r.trainDigit}\n  Scores: ${scoreText}\n  Predicted: ${r.predicted} `;
   entry.textContent = text;
   const verdict = el("span", { class: r.wrong ? "bad" : "good" });
-  verdict.textContent = !r.wrong ? "(correct)" : r.applied ? "(wrong, updating)" : "(wrong, waiting for back propagation)";
+  verdict.textContent = !r.wrong ? "(correct)" : r.applied ? "(wrong, updating)" : "(wrong, waiting to adjust weights)";
   entry.appendChild(verdict);
   r.logEntry = { entry, verdict };
   if (r.applied || !r.wrong) appendLogResult(r);
@@ -572,7 +572,7 @@ function renderAll(changedDigits = []) {
   renderWeights(changedDigits, predicted);
   renderStats();
   renderExplain();
-  renderBackprop();
+  renderAdjustPanel();
 }
 
 // ---------------------------------------------------------------------------
@@ -617,7 +617,7 @@ function applyPending() {
   return r;
 }
 
-function performBackprop() {
+function performAdjust() {
   const r = applyPending();
   if (!r) return;
   showTrainingInput(r);
@@ -716,13 +716,13 @@ function init() {
   $("#btn-finish").addEventListener("click", finish);
   $("#btn-reset").addEventListener("click", resetModel);
   $("#btn-clear-log").addEventListener("click", clearLog);
-  $("#btn-backprop").addEventListener("click", performBackprop);
+  $("#btn-adjust").addEventListener("click", performAdjust);
   for (const id of ["#opt-set", "#opt-order", "#opt-init"]) {
     $(id).addEventListener("change", resetModel);
   }
   $("#opt-update").addEventListener("change", () => {
     // Switching back to automatic finishes any update that was waiting
-    if (!manualUpdates() && model.pending) performBackprop();
+    if (!manualUpdates() && model.pending) performAdjust();
     else renderAll();
   });
 
@@ -732,7 +732,7 @@ function init() {
     if (e.key === "s" || e.key === "S" || e.key === "ArrowRight") { stopPlay(); doStep(); e.preventDefault(); }
     else if (e.key === " ") { togglePlay(); e.preventDefault(); }
     else if (e.key === "r" || e.key === "R") { resetModel(); e.preventDefault(); }
-    else if (e.key === "b" || e.key === "B") { performBackprop(); e.preventDefault(); }
+    else if (e.key === "a" || e.key === "A") { performAdjust(); e.preventDefault(); }
   });
 
   resetModel();

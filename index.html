@@ -113,9 +113,9 @@
         <h2 id="model-h">3 · The model is just these numbers</h2>
         <span class="legend"><i class="sw pos"></i>positive <i class="sw neg"></i>negative</span>
       </div>
-      <div id="backprop" class="backprop" hidden>
-        <div id="backprop-text" class="backprop-text"></div>
-        <button id="btn-backprop" class="btn primary" disabled title="Shortcut: B">Perform Back Propagation</button>
+      <div id="adjust-panel" class="adjust-panel" hidden>
+        <div id="adjust-text" class="adjust-text"></div>
+        <button id="btn-adjust" class="btn primary" disabled title="Shortcut: A">Adjust Weights</button>
       </div>
       <div class="grid model">
         <figure class="net-fig">
@@ -147,7 +147,7 @@
           <li><strong>Light up a non-digit shape.</strong> The network still answers confidently. It can only choose from what it was trained on.</li>
           <li><strong>Someone has to know the right answers.</strong> Every update needs a label, which makes this <em>supervised</em> learning.</li>
         </ul>
-        <p class="muted small">Keyboard: <kbd>S</kbd>/<kbd>→</kbd> step · <kbd>Space</kbd> play/pause · <kbd>R</kbd> reset · <kbd>B</kbd> back propagation (manual mode)</p>
+        <p class="muted small">Keyboard: <kbd>S</kbd>/<kbd>→</kbd> step · <kbd>Space</kbd> play/pause · <kbd>R</kbd> reset · <kbd>A</kbd> adjust weights (manual mode)</p>
       </section>
     </div>
   </main>

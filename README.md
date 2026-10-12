@@ -32,13 +32,13 @@ billions of weights.
   weights.
 - **Set "Weight updates" to manual.** Each wrong guess pauses with the cells
   about to change marked +1 / −1, so you can discuss the mistake before
-  clicking **Perform Back Propagation** to apply it.
+  clicking **Adjust Weights** to apply it.
 - **Light up a shape that isn't a digit.** The network still answers confidently,
   because it can only pick from what it was trained on.
 - **Pick any weight and explain it.** You can't, which is why nobody can just
   "fix the bug" when a model gives a wrong answer.
 
-Keyboard shortcuts: `S` or `→` steps, `Space` plays/pauses, `R` resets, `B` performs back propagation (manual mode).
+Keyboard shortcuts: `S` or `→` steps, `Space` plays/pauses, `R` resets, `A` adjusts weights (manual mode).
 
 ## Run the console versions
 
