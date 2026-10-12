@@ -145,6 +145,7 @@ h3.sub { margin: 18px 0 8px; font-size: 15px; }
 
 /* ---------- scores ---------- */
 .scores { display: grid; gap: 4px; }
+.scores-hidden { color: var(--muted); font-size: 14px; padding: 6px 0; }
 .score-row {
   display: grid;
   grid-template-columns: 22px 1fr 44px;

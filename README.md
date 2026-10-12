@@ -30,7 +30,9 @@ billions of weights.
   answers, so training isn't deterministic.
 - **Random starting weights.** It still converges, but on yet another set of
   weights.
-- **Set "Weight updates" to manual.** Each wrong guess pauses with the cells
+- **Set "Weight updates" to manual.** Step first shows the next digit with a
+  "?" so the audience can guess; Step again reveals the network's guess. Each
+  wrong guess pauses with the cells
   about to change marked +1 / −1, so you can discuss the mistake before
   clicking **Adjust Weights** to apply it.
 - **Light up a shape that isn't a digit.** The network still answers confidently,

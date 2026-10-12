@@ -94,6 +94,7 @@ function createModel() {
     queue: [],
     pending: null, // a wrong guess whose weight update is waiting (manual mode)
     brokenBy: {},  // digit -> the earlier update that turned it from right to wrong
+    staged: null,  // manual mode: next training digit, shown but not yet guessed
     converged: false,
     convergedAt: null
   };
@@ -145,12 +146,21 @@ function nextEpochOrder() {
 
 // Forward pass: show the network the next training digit and let it guess.
 // Returns a record of what happened; weights are not changed yet.
-function forwardStep() {
+function nextTrainingDigit() {
+  if (model.staged !== null) {
+    const d = model.staged;
+    model.staged = null;
+    return d;
+  }
   if (model.queue.length === 0) {
     model.epoch++;
     model.queue = nextEpochOrder();
   }
-  const trainDigit = model.queue.shift();
+  return model.queue.shift();
+}
+
+function forwardStep() {
+  const trainDigit = nextTrainingDigit();
   const x = DIGITS[trainDigit];
   const scores = scoresFor(x);
   const predicted = predict(x);
@@ -260,7 +270,28 @@ function matchingDigit(x) {
   return null;
 }
 
+// Manual mode: the next training digit is on display but the network hasn't guessed yet
+function guessHidden() {
+  return model.staged !== null && inputSource.kind === "staged";
+}
+
 function renderPrediction() {
+  const src = $("#input-source");
+  const fromTraining = inputSource.kind === "train" || inputSource.kind === "staged";
+  src.textContent = inputSource.kind === "staged" ? `Up next: ${inputSource.digit}`
+    : inputSource.kind === "train" ? `Training on ${inputSource.digit}` : "Your input";
+  src.className = "pill" + (fromTraining ? " busy" : "");
+
+  const note = $("#pred-note");
+  note.className = "pred-note";
+
+  if (guessHidden()) {
+    $("#pred-digit").textContent = "?";
+    note.textContent = "Not predicted yet. Press Step to let the network guess.";
+    $("#scores").innerHTML = '<div class="scores-hidden">Scores appear after the network guesses.</div>';
+    return null;
+  }
+
   const scores = scoresFor(input);
   const predicted = predict(input);
   const values = Object.values(scores);
@@ -268,8 +299,6 @@ function renderPrediction() {
 
   $("#pred-digit").textContent = predicted;
 
-  const note = $("#pred-note");
-  note.className = "pred-note";
   const actual = matchingDigit(input);
   if (allTied) {
     note.textContent = "Every score ties, so it just picks the lowest digit. It hasn't learned anything yet.";
@@ -284,10 +313,6 @@ function renderPrediction() {
     note.textContent = `Wrong ✗ (it's ${aDigit(actual)})`;
     note.classList.add("bad");
   }
-
-  const src = $("#input-source");
-  src.textContent = inputSource.kind === "train" ? `Training on ${inputSource.digit}` : "Your input";
-  src.className = "pill" + (inputSource.kind === "train" ? " busy" : "");
 
   // Score bars
   const maxAbs = Math.max(1, ...values.map(Math.abs));
@@ -367,7 +392,7 @@ function renderNetwork(predicted) {
     t.textContent = d;
     svg.appendChild(t);
     const s = el("text", { class: "score-label", x: outX + 22, y: y + 4.5 }, SVG_NS);
-    s.textContent = `score ${scores[d]}`;
+    s.textContent = predicted === null ? "score ?" : `score ${scores[d]}`;
     svg.appendChild(s);
   });
 }
@@ -439,6 +464,9 @@ function renderStats() {
   } else if (model.converged) {
     status.textContent = `Learned ✓ in ${model.convergedAt} steps`;
     status.className = "pill good";
+  } else if (model.staged !== null) {
+    status.textContent = "Ready to guess";
+    status.className = "pill busy";
   } else if (playTimer) {
     status.textContent = "Training…";
     status.className = "pill busy";
@@ -460,6 +488,13 @@ function renderStats() {
 
 function renderExplain() {
   const box = $("#explain");
+  if (model.staged !== null) {
+    box.className = "explain";
+    box.innerHTML =
+      `<div class="head">Step ${model.step + 1} · Epoch ${model.epoch}: here's ${aDigit(model.staged)}</div>` +
+      `<div>What will the network guess? Press <strong>Step</strong> to find out.</div>`;
+    return;
+  }
   if (!lastRecord) return;
   const r = lastRecord;
   const scoreText = model.active.map((d) => `${d}=${r.scores[d]}`).join(", ");
@@ -588,6 +623,16 @@ function showTrainingInput(r) {
 function doStep() {
   if (model.pending) return;
   if (model.step >= MAX_STEPS) return stopPlay();
+
+  // Manual mode: show the next digit first so people can guess before the network does
+  if (manualUpdates() && model.staged === null) {
+    model.staged = nextTrainingDigit();
+    input = [...DIGITS[model.staged]];
+    inputSource = { kind: "staged", digit: model.staged };
+    renderAll();
+    return;
+  }
+
   const r = forwardStep();
   showTrainingInput(r);
 
